@@ -20,6 +20,9 @@ or https://software.intel.com/en-us/media-client-solutions-support.
 #include <iostream>
 #include "listener_wayland.h"
 #include "class_wayland.h"
+#include <unistd.h>
+#include <sys/syscall.h>
+
 
 /* drm listener */
 void drm_handle_device(void *data
@@ -98,6 +101,8 @@ void handle_done(void *data, struct wl_callback *callback, uint32_t time)
 
 void buffer_release(void *data, struct wl_buffer *buffer)
 {
+    printf("[%lu]	buffer_release+ wl_buffer %p\n", syscall(SYS_gettid), buffer); fflush(NULL);
     wl_buffer_destroy(buffer);
+    printf("[%lu]	buffer_release- wl_buffer %p\n", syscall(SYS_gettid), buffer); fflush(NULL);
     buffer = NULL;
 }

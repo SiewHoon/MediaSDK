@@ -17,6 +17,9 @@ The original version of this sample may be obtained from https://software.intel.
 or https://software.intel.com/en-us/media-client-solutions-support.
 \**********************************************************************************/
 
+#include <unistd.h>
+#include <sys/syscall.h>
+
 #if defined(LIBVA_DRM_SUPPORT) || defined(LIBVA_X11_SUPPORT) || defined(LIBVA_ANDROID_SUPPORT)
 
 #include "vaapi_device.h"
@@ -397,7 +400,9 @@ mfxStatus CVAAPIDeviceWayland::RenderFrame(mfxFrameSurface1 * pSurface, mfxFrame
             return mfx_res;
     }
 
+    printf("[%lu]	RenderBuffer+  (new) wl_buffer %p : surface %p\n", syscall(SYS_gettid), m_wl_buffer, pSurface); fflush(NULL);
     m_Wayland->RenderBuffer(m_wl_buffer, pSurface->Info.CropW, pSurface->Info.CropH);
+    printf("[%lu]	RenderBuffer-  (new) wl_buffer %p : surface %p\n", syscall(SYS_gettid), m_wl_buffer, pSurface); fflush(NULL);
 
     return mfx_res;
 }
