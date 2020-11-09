@@ -61,6 +61,16 @@ or https://software.intel.com/en-us/media-client-solutions-support.
 #error MFX_VERSION not defined
 #endif
 
+long long clock_time ()
+{
+   struct timeval tv;
+   long long clk_time = 0;
+   if (gettimeofday(&tv, NULL) == 0)
+     clk_time = tv.tv_sec * 1000000 + tv.tv_usec;
+
+   return clk_time;
+}
+
 CDecodingPipeline::CDecodingPipeline()
     : m_mfxBS(8 * 1024 * 1024)
 {
@@ -1565,13 +1575,13 @@ mfxStatus CDecodingPipeline::DeliverOutput(mfxFrameSurface1* frame)
                 res = sts;
             }
         } else if (m_eWorkMode == MODE_RENDERING) {
-            printf("[%lu]     RenderFrame+ surface %p\n", syscall(SYS_gettid), frame); fflush(NULL);
+            printf("[%lld][%lu]     RenderFrame+ surface %p\n", clock_time(), syscall(SYS_gettid), frame); fflush(NULL);
 #if D3D_SURFACES_SUPPORT
             res = m_d3dRender.RenderFrame(frame, m_pGeneralAllocator);
 #elif LIBVA_SUPPORT
             res = m_hwdev->RenderFrame(frame, m_pGeneralAllocator);
 #endif
-            printf("[%lu]     RenderFrame- surface %p\n", syscall(SYS_gettid), frame); fflush(NULL);
+            printf("[%lld][%lu]     RenderFrame- surface %p\n", clock_time(), syscall(SYS_gettid), frame); fflush(NULL);
 
             msdk_tick current_tick = msdk_time_get_tick();
             while( m_delayTicks && (m_startTick + m_delayTicks > current_tick) )
@@ -1658,9 +1668,10 @@ mfxStatus CDecodingPipeline::SyncOutputSurface(mfxU32 wait)
     }
 
     mfxFrameSurface1* frame = &(m_pCurrentOutputSurface->surface->frame);
-    printf("[%lu] SyncOperation+ surface %p\n", syscall(SYS_gettid), frame); fflush(NULL);
+
+    printf("[%lld][%lu] SyncOperation+ surface %p\n", clock_time(), syscall(SYS_gettid), frame); fflush(NULL);
     mfxStatus sts = m_mfxSession.SyncOperation(m_pCurrentOutputSurface->syncp, wait);
-    printf("[%lu] SyncOperation- surface %p\n", syscall(SYS_gettid), frame); fflush(NULL);
+    printf("[%lld][%lu] SyncOperation- surface %p\n", clock_time(), syscall(SYS_gettid), frame); fflush(NULL);
 
     if (MFX_ERR_GPU_HANG == sts && m_bSoftRobustFlag) {
         msdk_printf(MSDK_STRING("GPU hang happened\n"));
@@ -1835,9 +1846,9 @@ mfxStatus CDecodingPipeline::RunDecoding()
                     errorReport = (mfxExtDecodeErrorReport *)GetExtBuffer(pBitstream->ExtParam, pBitstream->NumExtParam, MFX_EXTBUFF_DECODE_ERROR_REPORT);
                 }
 #endif
-                printf("[%lu] DecodeFrameAsync+ in surface %p\n", syscall(SYS_gettid), &(m_pCurrentFreeSurface->frame)); fflush(NULL);
+                printf("[%lld][%lu] DecodeFrameAsync+ in surface %p\n", clock_time(), syscall(SYS_gettid), &(m_pCurrentFreeSurface->frame)); fflush(NULL);
                 sts = m_pmfxDEC->DecodeFrameAsync(pBitstream, &(m_pCurrentFreeSurface->frame), &pOutSurface, &(m_pCurrentFreeOutputSurface->syncp));
-                printf("[%lu] DecodeFrameAsync- sts %d, out surface %p\n", syscall(SYS_gettid), sts, pOutSurface); fflush(NULL);
+                printf("[%lld][%lu] DecodeFrameAsync- sts %d, out surface %p\n", clock_time(), syscall(SYS_gettid), sts, pOutSurface); fflush(NULL);
 
 #if (MFX_VERSION >= 1025)
                 PrintDecodeErrorReport(errorReport);
@@ -1963,9 +1974,9 @@ mfxStatus CDecodingPipeline::RunDecoding()
 
                         // WA: RunFrameVPPAsync doesn't copy ViewId from input to output
                         m_pCurrentFreeVppSurface->frame.Info.FrameId.ViewId = pOutSurface->Info.FrameId.ViewId;
-                        printf("[%lu] RunFrameVPPAsync+ in surface %p, out surface %p\n", syscall(SYS_gettid), pOutSurface, &(m_pCurrentFreeVppSurface->frame)); fflush(NULL);
+                        printf("[%lld][%lu] RunFrameVPPAsync+ in surface %p, out surface %p\n", clock_time(), syscall(SYS_gettid), pOutSurface, &(m_pCurrentFreeVppSurface->frame)); fflush(NULL);
                         sts = m_pmfxVPP->RunFrameVPPAsync(pOutSurface, &(m_pCurrentFreeVppSurface->frame), NULL, &(m_pCurrentFreeOutputSurface->syncp));
-                        printf("[%lu] RunFrameVPPAsync- in surface %p, out surface %p\n", syscall(SYS_gettid), pOutSurface, &(m_pCurrentFreeVppSurface->frame)); fflush(NULL);
+                        printf("[%lld][%lu] RunFrameVPPAsync- in surface %p, out surface %p\n", clock_time(), syscall(SYS_gettid), pOutSurface, &(m_pCurrentFreeVppSurface->frame)); fflush(NULL);
 
                         if (MFX_WRN_DEVICE_BUSY == sts)
                         {

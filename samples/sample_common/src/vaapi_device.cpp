@@ -44,6 +44,16 @@ or https://software.intel.com/en-us/media-client-solutions-support.
 #define VAAPI_GET_X_DISPLAY(_display) (Display*)(_display)
 #define VAAPI_GET_X_WINDOW(_window) (Window*)(_window)
 
+long long clock_time_3()
+{
+   struct timeval tv;
+   long long clk_time = 0;
+   if (gettimeofday(&tv, NULL) == 0)
+     clk_time = tv.tv_sec * 1000000 + tv.tv_usec;
+
+   return clk_time;
+}
+
 CVAAPIDeviceX11::~CVAAPIDeviceX11(void)
 {
     Close();
@@ -361,6 +371,7 @@ mfxStatus CVAAPIDeviceWayland::RenderFrame(mfxFrameSurface1 * pSurface, mfxFrame
     mfxStatus mfx_res = MFX_ERR_NONE;
     vaapiMemId * memId = NULL;
     struct wl_buffer *m_wl_buffer = NULL;
+
     if(NULL==pSurface) {
         mfx_res = MFX_ERR_UNKNOWN;
         return mfx_res;
@@ -400,9 +411,9 @@ mfxStatus CVAAPIDeviceWayland::RenderFrame(mfxFrameSurface1 * pSurface, mfxFrame
             return mfx_res;
     }
 
-    printf("[%lu]	RenderBuffer+  (new) wl_buffer %p : surface %p\n", syscall(SYS_gettid), m_wl_buffer, pSurface); fflush(NULL);
+    printf("[%lld][%lu]	RenderBuffer+  (new) wl_buffer %p : surface %p\n", clock_time_3(), syscall(SYS_gettid), m_wl_buffer, pSurface); fflush(NULL);
     m_Wayland->RenderBuffer(m_wl_buffer, pSurface->Info.CropW, pSurface->Info.CropH);
-    printf("[%lu]	RenderBuffer-  (new) wl_buffer %p : surface %p\n", syscall(SYS_gettid), m_wl_buffer, pSurface); fflush(NULL);
+    printf("[%lld][%lu]	RenderBuffer-  (new) wl_buffer %p : surface %p\n", clock_time_3(), syscall(SYS_gettid), m_wl_buffer, pSurface); fflush(NULL);
 
     return mfx_res;
 }

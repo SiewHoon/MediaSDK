@@ -22,7 +22,18 @@ or https://software.intel.com/en-us/media-client-solutions-support.
 #include "class_wayland.h"
 #include <unistd.h>
 #include <sys/syscall.h>
+#include <sys/time.h>
 
+long long clock_time_2()
+{
+   struct timeval tv;
+   long long clk_time = 0;
+
+   if (gettimeofday(&tv, NULL) == 0)
+     clk_time = tv.tv_sec * 1000000 + tv.tv_usec;
+
+   return clk_time;
+}
 
 /* drm listener */
 void drm_handle_device(void *data
@@ -101,8 +112,8 @@ void handle_done(void *data, struct wl_callback *callback, uint32_t time)
 
 void buffer_release(void *data, struct wl_buffer *buffer)
 {
-    printf("[%lu]	buffer_release+ wl_buffer %p\n", syscall(SYS_gettid), buffer); fflush(NULL);
+    printf("[%lld][%lu]	buffer_release+ wl_buffer %p\n", clock_time_2(), syscall(SYS_gettid), buffer); fflush(NULL);
     wl_buffer_destroy(buffer);
-    printf("[%lu]	buffer_release- wl_buffer %p\n", syscall(SYS_gettid), buffer); fflush(NULL);
+    printf("[%lld][%lu]	buffer_release- wl_buffer %p\n", clock_time_2(), syscall(SYS_gettid), buffer); fflush(NULL);
     buffer = NULL;
 }
