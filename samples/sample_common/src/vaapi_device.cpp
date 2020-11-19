@@ -371,11 +371,14 @@ mfxStatus CVAAPIDeviceWayland::RenderFrame(mfxFrameSurface1 * pSurface, mfxFrame
     mfxStatus mfx_res = MFX_ERR_NONE;
     vaapiMemId * memId = NULL;
     struct wl_buffer *m_wl_buffer = NULL;
+    mfxFrameSurface1 *pInSurface;
 
     if(NULL==pSurface) {
         mfx_res = MFX_ERR_UNKNOWN;
         return mfx_res;
     }
+
+    pInSurface = pSurface;
     m_Wayland->Sync();
     memId = (vaapiMemId*)(pSurface->Data.MemId);
 
@@ -412,7 +415,7 @@ mfxStatus CVAAPIDeviceWayland::RenderFrame(mfxFrameSurface1 * pSurface, mfxFrame
     }
 
     printf("[%lld][%lu]	RenderBuffer+  (new) wl_buffer %p : surface %p\n", clock_time_3(), syscall(SYS_gettid), m_wl_buffer, pSurface); fflush(NULL);
-    m_Wayland->RenderBuffer(m_wl_buffer, pSurface->Info.CropW, pSurface->Info.CropH);
+    m_Wayland->RenderBuffer(m_wl_buffer, pSurface->Info.CropW, pSurface->Info.CropH, pInSurface);
     printf("[%lld][%lu]	RenderBuffer-  (new) wl_buffer %p : surface %p\n", clock_time_3(), syscall(SYS_gettid), m_wl_buffer, pSurface); fflush(NULL);
 
     return mfx_res;

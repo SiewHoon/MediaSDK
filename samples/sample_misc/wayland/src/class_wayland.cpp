@@ -63,6 +63,8 @@ Wayland::Wayland()
     , m_device_name(NULL)
     , m_x(0), m_y(0)
     , m_perf_mode(false)
+    , m_pBufferHead(NULL)
+    , m_pBufferTail(NULL)
 {
     std::memset(&m_poll, 0, sizeof(m_poll));
 }
@@ -93,6 +95,7 @@ bool Wayland::InitDisplay()
 
     m_poll.fd = m_display_fd;
     m_poll.events = POLLIN;
+
     return true;
 }
 
@@ -156,6 +159,7 @@ void Wayland::Sync()
         wl_display_read_events(m_display);
         wl_display_dispatch_queue_pending(m_display, m_event_queue);
     }
+    RemoveBufferFromHead();
 }
 
 void Wayland::SetPerfMode(bool perf_mode)
@@ -170,20 +174,39 @@ void Wayland::SetRenderWinPos(int x, int y)
 
 void Wayland::RenderBuffer(struct wl_buffer *buffer
      , int32_t width
-     , int32_t height)
+     , int32_t height
+     , mfxFrameSurface1 *surface
+     )
 {
+    struct buffer *my_buffer = new struct buffer;
+    if (my_buffer == NULL) 
+      return;
+
+    my_buffer->buffer = buffer;
+    my_buffer->pInSurface = surface;
+    my_buffer->next = NULL;
+    my_buffer->done = false;
+
     wl_surface_attach(m_surface, buffer, 0, 0);
     wl_surface_damage(m_surface, m_x, m_y, width, height);
 
     wl_proxy_set_queue((struct wl_proxy *) buffer, m_event_queue);
 
-    wl_buffer_add_listener(buffer, &buffer_listener, NULL);
+    AddBufferToTail(my_buffer);
+
+    //wl_buffer_add_listener(buffer, &buffer_listener, NULL);
+    //wl_buffer_add_listener(buffer, &buffer_listener, &my_buffer);
+    wl_buffer_add_listener(buffer, &buffer_listener, my_buffer);
+
     m_pending_frame=1;
-    if (m_perf_mode)
-        m_callback = wl_display_sync(m_display);
-    else
-    m_callback = wl_surface_frame(m_surface);
+//    if (m_perf_mode)
+//        m_callback = wl_display_sync(m_display);
+//    else
+        m_callback = wl_surface_frame(m_surface);
+
     wl_callback_add_listener(m_callback, &frame_listener, this);
+    //wl_callback_add_listener(m_callback, &frame_listener, &my_buffer);
+
     wl_proxy_set_queue((struct wl_proxy *) m_callback, m_event_queue);
     wl_surface_commit(m_surface);
     wl_display_dispatch_queue(m_display, m_event_queue);
@@ -428,6 +451,78 @@ void Wayland::DrmHandleAuthenticated()
     m_bufmgr = drm_intel_bufmgr_gem_init(m_fd, BATCH_SIZE);
 }
 
+
+void Wayland::BufferSurfIncRef(buffer *buffer)
+{
+    if (buffer && buffer->pInSurface) {
+      msdkFrameSurface *surface = FindUsedSurface(buffer->pInSurface);
+      msdk_atomic_inc16(&(surface->render_lock));
+    }
+}
+
+void Wayland::BufferSurfDecRef(buffer *buffer)
+{
+    if (buffer && buffer->pInSurface) {
+      msdkFrameSurface *surface = FindUsedSurface(buffer->pInSurface);
+      msdk_atomic_dec16(&(surface->render_lock));
+    }
+}
+
+/*
+ *  FIFO concept: 
+ *   1). new buffer element add add into tail.
+ *   2). remove buffer element from tail once completed.
+*/ 
+void Wayland::AddBufferToTail(buffer *buffer)
+{
+   if (buffer == NULL)
+     return;
+
+   if (m_pBufferHead == NULL && m_pBufferTail == NULL) {
+     m_pBufferHead = buffer;
+     m_pBufferTail = buffer;
+   } else {
+     if (m_pBufferHead->next == NULL) {
+	 m_pBufferTail = buffer;
+	 m_pBufferHead->next = m_pBufferTail;
+     } else {
+        m_pBufferTail->next = buffer;
+        m_pBufferTail = buffer;
+     }
+     BufferSurfIncRef(buffer);
+   }
+}
+
+//void Wayland::RemoveBufferFromHead(struct wl_buffer *buffer)
+void Wayland::RemoveBufferFromHead()
+{
+   struct buffer *tmp_buffer = NULL;
+
+   //if (buffer == NULL)
+   //  return;
+
+   if (m_pBufferHead == NULL)
+     return;
+
+   if (m_pBufferHead->done == true) {
+     if (m_pBufferHead->next == NULL) {
+        tmp_buffer = m_pBufferHead;
+        m_pBufferHead = NULL;
+	m_pBufferTail = NULL;
+     } else {
+       tmp_buffer = m_pBufferHead;
+       m_pBufferHead  = m_pBufferHead->next;
+     }
+
+     if (tmp_buffer) {
+       BufferSurfDecRef(tmp_buffer);
+       tmp_buffer->buffer = NULL;
+       tmp_buffer->pInSurface = NULL;
+       delete tmp_buffer;
+     }
+   }
+}
+
 Wayland* WaylandCreate()
 {
     return new Wayland;
@@ -437,4 +532,3 @@ void WaylandDestroy(Wayland *pWld)
 {
     delete pWld;
 }
-

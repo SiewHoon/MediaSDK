@@ -112,6 +112,9 @@ void handle_done(void *data, struct wl_callback *callback, uint32_t time)
 
 void buffer_release(void *data, struct wl_buffer *buffer)
 {
+    struct buffer *my_buffer = static_cast<struct buffer*>(data);
+    my_buffer->done = true;
+    
     printf("[%lld][%lu]	buffer_release+ wl_buffer %p\n", clock_time_2(), syscall(SYS_gettid), buffer); fflush(NULL);
     wl_buffer_destroy(buffer);
     printf("[%lld][%lu]	buffer_release- wl_buffer %p\n", clock_time_2(), syscall(SYS_gettid), buffer); fflush(NULL);
